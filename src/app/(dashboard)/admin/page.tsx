@@ -1,6 +1,9 @@
-import dynamic from "next/dynamic";
 import Announcements from "@/components/Announcements";
+import dynamic from "next/dynamic";
 
+export async function AnnouncementsWrapper() {
+  return <Announcements />;
+}
 // Lazy load client-only components
 const UserCard = dynamic(() => import("@/components/UserCard"), { ssr: false });
 const CountChartContainer = dynamic(() => import("@/components/CountChartContainer"), { ssr: false });
