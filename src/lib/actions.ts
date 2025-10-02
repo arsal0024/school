@@ -150,14 +150,15 @@ export const createTeacher = async (
   currentState: CurrentState,
   data: TeacherSchema
 ) => {
+  let user: any;
   try {
-    const user = await clerkClient.users.createUser({
+    user = await clerkClient.users.createUser({
       username: data.username,
       emailAddress: [data.email],
       password: data.password,
       firstName: data.name,
       lastName: data.surname,
-      publicMetadata:{role:"teacher"}
+      publicMetadata: { role: "teacher" }
     });
 
     await prisma.teacher.create({
@@ -180,12 +181,34 @@ export const createTeacher = async (
         },
       },
     });
-
-    // revalidatePath("/list/teachers");
     return { success: true, error: false };
-  } catch (err) {
-    console.log(err);
-    return { success: false, error: true };
+  } catch (err: any) {
+    console.error(err);
+    if (user?.id) {
+      try {
+        await clerkClient.users.deleteUser(user.id);
+        console.log(`Rolled back Clerk user ${user.id}`);
+      } catch (deleteErr) {
+        console.error("Failed to delete Clerk user during rollback:", deleteErr);
+      }
+    }
+    if (err.code === "P2002") {
+      return {
+        success: false,
+        error: `Duplicate value for field: ${err.meta?.target?.join(", ")}`,
+      };
+    }
+    if (err.errors && Array.isArray(err.errors)) {
+      return {
+        success: false,
+        error: err.errors.map((e: any) => e.message).join(", "),
+      };
+    }
+
+    return {
+      success: false,
+      error: err.message || "Unexpected error occurred"
+    };
   }
 };
 
@@ -194,22 +217,24 @@ export const updateTeacher = async (
   data: TeacherSchema
 ) => {
   if (!data.id) {
-    return { success: false, error: true };
+    return { success: false, error: "Missing teacher ID" };
   }
+
   try {
-    const user = await clerkClient.users.updateUser(data.id, {
+    // Update Clerk user
+    await clerkClient.users.updateUser(data.id, {
       username: data.username,
       ...(data.password !== "" && { password: data.password }),
       firstName: data.name,
       lastName: data.surname,
-    });  
+    });
+
+    // Update DB teacher
     await prisma.teacher.update({
-      where: {
-        id: data.id,
-      },
+      where: { id: data.id },
       data: {
-        ...(data.password !== "" && { password: data.password }),
         username: data.username,
+        ...(data.password !== "" && { password: data.password }),
         name: data.name,
         surname: data.surname,
         email: data.email || null,
@@ -226,13 +251,32 @@ export const updateTeacher = async (
         },
       },
     });
-    // revalidatePath("/list/teachers");
+
     return { success: true, error: false };
-  } catch (err) {
-    console.log(err);
-    return { success: false, error: true };
+  } catch (err: any) {
+    console.error(err);
+
+    if (err.code === "P2002") {
+      return {
+        success: false,
+        error: `Duplicate value for field: ${err.meta?.target?.join(", ")}`,
+      };
+    }
+
+    if (err.errors && Array.isArray(err.errors)) {
+      return {
+        success: false,
+        error: err.errors.map((e: any) => e.message).join(", "),
+      };
+    }
+
+    return {
+      success: false,
+      error: err.message || "Unexpected error occurred",
+    };
   }
 };
+
 
 export const deleteTeacher = async (
   currentState: CurrentState,
@@ -260,26 +304,29 @@ export const createStudent = async (
   currentState: CurrentState,
   data: StudentSchema
 ) => {
-  console.log(data);
+  let user: any;
   try {
+    // Check class capacity
     const classItem = await prisma.class.findUnique({
       where: { id: data.classId },
       include: { _count: { select: { students: true } } },
     });
 
     if (classItem && classItem.capacity === classItem._count.students) {
-      return { success: false, error: true };
+      return { success: false, error: "Class is already full" };
     }
 
-    const user = await clerkClient.users.createUser({
+    // Create Clerk user
+    user = await clerkClient.users.createUser({
       username: data.username,
       emailAddress: [data.email],
       password: data.password,
       firstName: data.name,
       lastName: data.surname,
-      publicMetadata:{role:"student"}
+      publicMetadata: { role: "student" },
     });
 
+    // Create student in DB
     await prisma.student.create({
       data: {
         id: user.id,
@@ -299,36 +346,65 @@ export const createStudent = async (
       },
     });
 
-    // revalidatePath("/list/students");
     return { success: true, error: false };
-  } catch (err) {
-    console.log(err);
-    return { success: false, error: true };
+  } catch (err: any) {
+    console.error(err);
+
+    // Rollback Clerk user if DB insert fails
+    if (user?.id) {
+      try {
+        await clerkClient.users.deleteUser(user.id);
+        console.log(`Rolled back Clerk user ${user.id}`);
+      } catch (deleteErr) {
+        console.error("Failed to delete Clerk user during rollback:", deleteErr);
+      }
+    }
+
+    if (err.code === "P2002") {
+      return {
+        success: false,
+        error: `Duplicate value for field: ${err.meta?.target?.join(", ")}`,
+      };
+    }
+
+    if (err.errors && Array.isArray(err.errors)) {
+      return {
+        success: false,
+        error: err.errors.map((e: any) => e.message).join(", "),
+      };
+    }
+
+    return {
+      success: false,
+      error: err.message || "Unexpected error occurred",
+    };
   }
 };
+
 
 export const updateStudent = async (
   currentState: CurrentState,
   data: StudentSchema
 ) => {
   if (!data.id) {
-    return { success: false, error: true };
+    return { success: false, error: "Missing student ID" };
   }
+
   try {
-    const user = await clerkClient.users.updateUser(data.id, {
+    // Update Clerk user
+    await clerkClient.users.updateUser(data.id, {
       username: data.username,
       ...(data.password !== "" && { password: data.password }),
       firstName: data.name,
       lastName: data.surname,
     });
 
+    // Update DB student
     await prisma.student.update({
-      where: {
-        id: data.id,
-      },
+      where: { id: data.id },
       data: {
-        ...(data.password !== "" && { password: data.password }),
         username: data.username,
+        ...(data.password !== "" && { password: data.password }),
         name: data.name,
         surname: data.surname,
         email: data.email || null,
@@ -343,13 +419,32 @@ export const updateStudent = async (
         parentId: data.parentId,
       },
     });
-    // revalidatePath("/list/students");
+
     return { success: true, error: false };
-  } catch (err) {
-    console.log(err);
-    return { success: false, error: true };
+  } catch (err: any) {
+    console.error(err);
+
+    if (err.code === "P2002") {
+      return {
+        success: false,
+        error: `Duplicate value for field: ${err.meta?.target?.join(", ")}`,
+      };
+    }
+
+    if (err.errors && Array.isArray(err.errors)) {
+      return {
+        success: false,
+        error: err.errors.map((e: any) => e.message).join(", "),
+      };
+    }
+
+    return {
+      success: false,
+      error: err.message || "Unexpected error occurred",
+    };
   }
 };
+
 
 export const deleteStudent = async (
   currentState: CurrentState,
@@ -477,14 +572,14 @@ export const deleteExam = async (
   }
 };
 
-
-
 export const createParent = async (
   currentState: CurrentState,
   data: ParentSchema
 ) => {
+  let user: any;
   try {
-    const user = await clerkClient.users.createUser({
+    // Create Clerk user
+    user = await clerkClient.users.createUser({
       username: data.username,
       emailAddress: data.email ? [data.email] : [],
       password: data.password,
@@ -493,6 +588,7 @@ export const createParent = async (
       publicMetadata: { role: "parent" },
     });
 
+    // Create parent in DB
     await prisma.parent.create({
       data: {
         id: user.id,
@@ -506,21 +602,50 @@ export const createParent = async (
     });
 
     return { success: true, error: false };
-  } catch (err) {
+  } catch (err: any) {
     console.error(err);
-    return { success: false, error: true };
+
+    // Rollback Clerk user if DB insert fails
+    if (user?.id) {
+      try {
+        await clerkClient.users.deleteUser(user.id);
+        console.log(`Rolled back Clerk user ${user.id}`);
+      } catch (deleteErr) {
+        console.error("Failed to delete Clerk user during rollback:", deleteErr);
+      }
+    }
+
+    if (err.code === "P2002") {
+      return {
+        success: false,
+        error: `Duplicate value for field: ${err.meta?.target?.join(", ")}`,
+      };
+    }
+
+    if (err.errors && Array.isArray(err.errors)) {
+      return {
+        success: false,
+        error: err.errors.map((e: any) => e.message).join(", "),
+      };
+    }
+
+    return {
+      success: false,
+      error: err.message || "Unexpected error occurred",
+    };
   }
 };
 
-// ✅ Update Parent
 export const updateParent = async (
   currentState: CurrentState,
   data: ParentSchema
 ) => {
   if (!data.id) {
-    return { success: false, error: true };
+    return { success: false, error: "Missing parent ID" };
   }
+
   try {
+    // Update Clerk user
     await clerkClient.users.updateUser(data.id, {
       username: data.username,
       ...(data.password !== "" && { password: data.password }),
@@ -528,6 +653,7 @@ export const updateParent = async (
       lastName: data.surname,
     });
 
+    // Update DB parent
     await prisma.parent.update({
       where: { id: data.id },
       data: {
@@ -541,13 +667,31 @@ export const updateParent = async (
     });
 
     return { success: true, error: false };
-  } catch (err) {
+  } catch (err: any) {
     console.error(err);
-    return { success: false, error: true };
+
+    if (err.code === "P2002") {
+      return {
+        success: false,
+        error: `Duplicate value for field: ${err.meta?.target?.join(", ")}`,
+      };
+    }
+
+    if (err.errors && Array.isArray(err.errors)) {
+      return {
+        success: false,
+        error: err.errors.map((e: any) => e.message).join(", "),
+      };
+    }
+
+    return {
+      success: false,
+      error: err.message || "Unexpected error occurred",
+    };
   }
 };
 
-// ✅ Delete Parent
+
 export const deleteParent = async (
   currentState: CurrentState,
   data: FormData
@@ -626,7 +770,7 @@ export const deleteLesson = async (
 ) => {
   const id = data.get("id") as string;
   console.log(id);
-  
+
   try {
     await prisma.lesson.delete({
       where: {

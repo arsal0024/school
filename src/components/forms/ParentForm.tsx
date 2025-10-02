@@ -33,18 +33,19 @@ const ParentForm = ({
     type === "create" ? createParent : updateParent,
     {
       success: false,
-      error: false,
+      error: null as any,
     }
   );
 
   const onSubmit = handleSubmit((data) => {
+    console.log(data);    
     formAction(data);
   });
 
   const router = useRouter();
 
   useEffect(() => {
-    if (state.success) {
+    if (state?.success) {
       toast(`Parent has been ${type === "create" ? "created" : "updated"}!`);
       setOpen(false);
       router.refresh();
@@ -127,8 +128,8 @@ const ParentForm = ({
           />
         )}
       </div>
-      {state.error && (
-        <span className="text-red-500">Something went wrong!</span>
+      {state?.error && (
+        <span className="text-red-500"> {state?.error} </span>
       )}
       <button className="bg-blue-400 text-white p-2 rounded-md">
         {type === "create" ? "Create" : "Update"}

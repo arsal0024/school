@@ -47,7 +47,7 @@ const StudentForm = ({
     type === "create" ? createStudent : updateStudent,
     {
       success: false,
-      error: false,
+      error: null as any,
     }
   );
 
@@ -249,8 +249,8 @@ const StudentForm = ({
           )}
         </div>
       </div>
-      {state.error && (
-        <span className="text-red-500">Something went wrong!</span>
+      {state?.error && (
+        <span className="text-red-500"> {state?.error} </span>
       )}
       <button type="submit" className="bg-blue-400 text-white p-2 rounded-md">
         {type === "create" ? "Create" : "Update"}
