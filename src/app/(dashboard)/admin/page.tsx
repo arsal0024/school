@@ -1,12 +1,9 @@
-import dynamic from "next/dynamic";
-
-const UserCard = dynamic(() => import("@/components/UserCard"), { ssr: false });
-const CountChartContainer = dynamic(() => import("@/components/CountChartContainer"), { ssr: false });
-const AttendanceChartContainer = dynamic(() => import("@/components/AttendanceChartContainer"), { ssr: false });
-const FinanceChart = dynamic(() => import("@/components/FinanceChart"), { ssr: false });
-const EventCalendarContainer = dynamic(() => import("@/components/EventCalendarContainer"), { ssr: false });
-const Announcements = dynamic(() => import("@/components/Announcements"), { ssr: false });
-
+import Announcements from "@/components/Announcements";
+import AttendanceChartContainer from "@/components/AttendanceChartContainer";
+import CountChartContainer from "@/components/CountChartContainer";
+import EventCalendarContainer from "@/components/EventCalendarContainer";
+import FinanceChart from "@/components/FinanceChart";
+import UserCard from "@/components/UserCard";
 
 const AdminPage = ({
   searchParams
